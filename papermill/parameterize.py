@@ -8,7 +8,7 @@ from .exceptions import PapermillMissingParameterException
 from .iorw import read_yaml_file
 from .log import logger
 from .translators import translate_parameters
-from .utils import find_first_tagged_cell_index
+from .utils import find_first_tagged_cell_index, find_all_tagged_cell_indices
 
 
 def add_builtin_parameters(parameters):
@@ -64,6 +64,7 @@ def parameterize_notebook(
     kernel_name=None,
     language=None,
     engine_name=None,
+    parameter_tags=['parameters'],
 ):
     """Assigned parameters into the appropriate place in the input notebook
 
@@ -77,6 +78,8 @@ def parameterize_notebook(
        Flag to set report mode
     comment : str, optional
         Comment added to the injected cell
+    parameter_tags: list of str, optional
+        Tags to search for parameter celles. Defaults to ['parameters']
     """
     # Load from a file if 'parameters' is a string.
     if isinstance(parameters, str):
@@ -99,19 +102,22 @@ def parameterize_notebook(
         newcell.metadata['jupyter'] = newcell.get('jupyter', {})
         newcell.metadata['jupyter']['source_hidden'] = True
 
-    param_cell_index = find_first_tagged_cell_index(nb, 'parameters')
+    # Find all parameters cells  with any of the specified tags
+    param_cell_indices = find_all_tagged_cell_indices(nb, parameter_tags)
     injected_cell_index = find_first_tagged_cell_index(nb, 'injected-parameters')
+
     if injected_cell_index >= 0:
         # Replace the injected cell with a new version
         before = nb.cells[:injected_cell_index]
         after = nb.cells[injected_cell_index + 1 :]
-    elif param_cell_index >= 0:
-        # Add an injected cell after the parameter cell
-        before = nb.cells[: param_cell_index + 1]
-        after = nb.cells[param_cell_index + 1 :]
+    elif param_cell_indices:
+        # Add an injected cell after the last parameter cell
+        last_param_index = max(param_cell_indices)
+        before = nb.cells[: last_param_index + 1]
+        after = nb.cells[last_param_index + 1 :]
     else:
         # Inject to the top of the notebook
-        logger.warning("Input notebook does not contain a cell with tag 'parameters'")
+        logger.warning("Input notebook does not contain a cell with any of tags: %s", ", ".join(parameter_tags))
         before = []
         after = nb.cells
 

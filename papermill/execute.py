@@ -11,6 +11,7 @@ from .parameterize import add_builtin_parameters, parameterize_notebook, paramet
 from .utils import chdir
 
 
+
 def execute_notebook(
     input_path,
     output_path,
@@ -27,6 +28,7 @@ def execute_notebook(
     start_timeout=60,
     report_mode=False,
     cwd=None,
+    parameter_tags=None,  # New parameter
     **engine_kwargs,
 ):
     """Executes a single notebook locally.
@@ -61,6 +63,8 @@ def execute_notebook(
         Flag for whether or not to hide input.
     cwd : str or Path, optional
         Working directory to use when executing the notebook
+    parameter_tags : list of str, optional
+        Tags to search for parameter cells. Defaults to ['parameters']
     **kwargs
         Arbitrary keyword arguments to pass to the notebook engine
 
@@ -75,6 +79,10 @@ def execute_notebook(
         output_path = str(output_path)
     if isinstance(cwd, Path):
         cwd = str(cwd)
+    
+    # Default parameter tags
+    if parameter_tags is None:
+        parameter_tags = ['parameters']
 
     path_parameters = add_builtin_parameters(parameters)
     input_path = parameterize_path(input_path, path_parameters)
@@ -90,7 +98,7 @@ def execute_notebook(
 
         # Parameterize the Notebook.
         if parameters:
-            parameter_predefined = _infer_parameters(nb, name=kernel_name, language=language)
+            parameter_predefined = _infer_parameters(nb, name=kernel_name, language=language, parameter_tags=parameter_tags)
             parameter_predefined = {p.name for p in parameter_predefined}
             for p in parameters:
                 if p not in parameter_predefined:
@@ -102,6 +110,7 @@ def execute_notebook(
                 kernel_name=kernel_name,
                 language=language,
                 engine_name=engine_name,
+                parameter_tags=parameter_tags,  # Pass through parameter tags
             )
 
         nb = prepare_notebook_metadata(nb, input_path, output_path, report_mode)
@@ -134,8 +143,7 @@ def execute_notebook(
         write_ipynb(nb, output_path)
 
         return nb
-
-
+        
 def prepare_notebook_metadata(nb, input_path, output_path, report_mode=False):
     """Prepare metadata associated with a notebook and its cells
 

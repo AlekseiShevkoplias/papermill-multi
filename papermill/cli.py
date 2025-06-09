@@ -46,6 +46,11 @@ def print_papermill_version(ctx, param, value):
 @click.option('--parameters_yaml', '-y', multiple=True, help='YAML string to be used as parameters.')
 @click.option('--parameters_base64', '-b', multiple=True, help='Base64 encoded YAML string as parameters.')
 @click.option(
+    '--parameter-tags',
+    multiple=True,
+    help='Tags to search for parameter cells. Can be specified multiple times. Defaults to "parameters".',
+)
+@click.option(
     '--inject-input-path',
     is_flag=True,
     default=False,
@@ -147,6 +152,7 @@ def papermill(
     parameters_file,
     parameters_yaml,
     parameters_base64,
+    parameter_tags,
     inject_input_path,
     inject_output_path,
     inject_paths,
@@ -211,6 +217,12 @@ def papermill(
 
     logging.basicConfig(level=log_level, format="%(message)s")
 
+    # Handle parameter tags - convert to list and set default
+    if parameter_tags:
+        parameter_tags = list(parameter_tags)
+    else:
+        parameter_tags = ['parameters']
+
     # Read in Parameters
     parameters_final = {}
     if inject_input_path or inject_paths:
@@ -229,7 +241,7 @@ def papermill(
         parameters_final[name] = value
 
     if help_notebook:
-        sys.exit(display_notebook_help(click_ctx, notebook_path, parameters_final))
+        sys.exit(display_notebook_help(click_ctx, notebook_path, parameters_final, parameter_tags))
 
     try:
         execute_notebook(
@@ -250,6 +262,7 @@ def papermill(
             report_mode=report_mode,
             cwd=cwd,
             execution_timeout=execution_timeout,
+            parameter_tags=parameter_tags,
         )
     except nbclient.exceptions.DeadKernelError:
         # Exiting with a special exit code for dead kernels

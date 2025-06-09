@@ -127,3 +127,7 @@ pip-wheel-metadata
 
 # lint
 .ruff_cache/
+
+# utility
+context.txt
+test_log.txt

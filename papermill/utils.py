@@ -26,6 +26,22 @@ def any_tagged_cell(nb, tag):
     """
     return any([tag in cell.metadata.tags for cell in nb.cells])
 
+def any_tagged_cells(nb, tags):
+    """Whether the notebook contains at least one cell tagged with any of the specified tags.
+
+    Parameters
+    ----------
+    nb : nbformat.NotebookNode
+        The notebook to introspect
+    tags : list of str
+        The tags to look for
+
+    Returns
+    -------
+    bool
+        Whether the notebook contains a cell tagged with any of the specified tags
+    """
+    return len(find_all_tagged_cell_indices(nb, tags)) > 0
 
 def nb_kernel_name(nb, name=None):
     """Helper for fetching out the kernel name from a notebook object.
@@ -104,6 +120,93 @@ def find_first_tagged_cell_index(nb, tag):
     if not parameters_indices:
         return -1
     return parameters_indices[0]
+
+
+def find_all_tagged_cell_indices(nb, tags):
+    """Find all cells tagged with any of the specified tags.
+
+    Parameters
+    ----------
+    nb : nbformat.NotebookNode
+        The notebook to introspect
+    tags : list of str
+        The tags to look for
+
+    Returns
+    -------
+    list of int
+        Indices of cells that have any of the specified tags
+    """
+    indices = []
+    for idx, cell in enumerate(nb.cells):
+        cell_tags = cell.get('metadata', {}).get('tags', [])
+        if any(tag in cell_tags for tag in tags):
+            indices.append(idx)
+    return indices
+
+
+def any_tagged_cells(nb, tags):
+    """Whether the notebook contains at least one cell tagged with any of the specified tags.
+
+    Parameters
+    ----------
+    nb : nbformat.NotebookNode
+        The notebook to introspect
+    tags : list of str
+        The tags to look for
+
+    Returns
+    -------
+    bool
+        Whether the notebook contains a cell tagged with any of the specified tags
+    """
+    if isinstance(tags, str):
+        tags = [tags]
+    return any(find_all_tagged_cell_indices(nb, tags))
+
+
+def collect_parameters_from_cells(nb, parameter_tags, kernel_name=None, language=None):
+    """Collect parameters from all cells tagged with any of the parameter tags.
+    
+    Parameters
+    ----------
+    nb : nbformat.NotebookNode
+        The notebook to introspect
+    parameter_tags : list of str
+        Tags to search for parameter cells
+    kernel_name : str, optional
+        Kernel name for parameter translation
+    language : str, optional  
+        Language for parameter translation
+        
+    Returns
+    -------
+    dict
+        Collected parameters from all parameter cells
+    """
+    from .translators import papermill_translators
+    
+    all_parameters = {}
+    param_indices = find_all_tagged_cell_indices(nb, parameter_tags)
+    
+    kernel_name = nb_kernel_name(nb, kernel_name)
+    language = nb_language(nb, language)
+    
+    translator = papermill_translators.find_translator(kernel_name, language)
+    
+    for idx in param_indices:
+        cell = nb.cells[idx]
+        try:
+            cell_params = translator.inspect(cell)
+            for param in cell_params:
+                if param.name in all_parameters:
+                    logger.warning(f"Parameter '{param.name}' defined in multiple parameter cells. Using latest definition.")
+                all_parameters[param.name] = param._asdict()
+        except NotImplementedError:
+            logger.warning(f"Translator for '{language}' language does not support parameter introspection.")
+            continue
+    
+    return all_parameters
 
 
 def merge_kwargs(caller_args, **callee_args):
