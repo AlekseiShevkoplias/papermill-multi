@@ -4,7 +4,7 @@
 Sphinx>=7.2.6
 furo>=2023.9.10
 myst-parser>=2.0.0
-moto>=4.2.8
+moto>=5.2.2
 sphinx-copybutton>=0.5.2
 nbformat
 entrypoints
